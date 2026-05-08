@@ -27,7 +27,11 @@ def test_chroma_data():
     """Verify Chroma DB has data"""
     print("\n🔍 Testing Chroma DB...")
     try:
-        client = chromadb.PersistentClient(path="database/chroma_db")
+        from chromadb.config import Settings
+        client = chromadb.PersistentClient(
+            path="database/chroma_db",
+            settings=Settings(anonymized_telemetry=False)
+        )
         collection = client.get_collection("jobs")
         count = collection.count()
         print(f"   ✅ Chroma DB has {count} jobs")

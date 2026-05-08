@@ -115,6 +115,37 @@
           >بحث ←</button>
         </div>
 
+        <!-- Website Filter -->
+        <div class="mt-6 bg-[#0f1828] border border-[#1a2840] rounded-2xl p-5">
+          <div class="text-xs mono text-slate-500 tracking-widest uppercase mb-3">من أين ابحث؟</div>
+          <div class="flex flex-wrap gap-3">
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" id="source-linkedin" class="source-filter w-4 h-4 rounded accent-teal-400" value="linkedin" checked />
+              <span class="text-sm text-slate-400 group-hover:text-teal-400 transition-colors">🔗 LinkedIn</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" id="source-wuzzuf" class="source-filter w-4 h-4 rounded accent-teal-400" value="wuzzuf" checked />
+              <span class="text-sm text-slate-400 group-hover:text-teal-400 transition-colors">🟢 Wuzzuf</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" id="source-nti" class="source-filter w-4 h-4 rounded accent-teal-400" value="nti" checked />
+              <span class="text-sm text-slate-400 group-hover:text-teal-400 transition-colors">📚 NTI</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" id="source-iti" class="source-filter w-4 h-4 rounded accent-teal-400" value="iti" checked />
+              <span class="text-sm text-slate-400 group-hover:text-teal-400 transition-colors">🏫 ITI</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" id="source-bayt" class="source-filter w-4 h-4 rounded accent-teal-400" value="bayt" />
+              <span class="text-sm text-slate-400 group-hover:text-teal-400 transition-colors">💼 Bayt</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer group">
+              <input type="checkbox" id="source-itida" class="source-filter w-4 h-4 rounded accent-teal-400" value="itida" />
+              <span class="text-sm text-slate-400 group-hover:text-teal-400 transition-colors">🚀 ITIDA</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Chips -->
         <div class="flex flex-wrap gap-2 justify-center mt-4">
           <span onclick="fillSearch('data scientist machine learning')"

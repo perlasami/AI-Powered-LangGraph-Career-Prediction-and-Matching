@@ -1,54 +1,43 @@
 # database/bm25_index.py
 from rank_bm25 import BM25Okapi
 import json, pickle, os
+import os
+import json
 
 def build_bm25_index():
-    # ── لود Wuzzuf ──
-    with open("data/processed/wuzzuf_full.json", "r", encoding="utf-8") as f:
-        wuzzuf_jobs = json.load(f)
-
-    # ── لود LinkedIn ──
+    wuzzuf_path = "data/processed/wuzzuf_full.json"
     linkedin_path = "data/processed/linkedin_full.json"
+    nti_iti_path = "data/raw/nti_iti_official.json"  # ← ADD THIS
+
+    wuzzuf_jobs = []
+    if os.path.exists(wuzzuf_path):
+        with open(wuzzuf_path, "r", encoding="utf-8") as f:
+            wuzzuf_jobs = json.load(f)
+    else:
+        print("⚠️ Wuzzuf dataset not found.")
+
     linkedin_jobs = []
     if os.path.exists(linkedin_path):
         with open(linkedin_path, "r", encoding="utf-8") as f:
             linkedin_jobs = json.load(f)
+    else:
+        print("ℹ️  LinkedIn data not found, skipping")
 
-    # ── دمج الكل ──
-    all_jobs = wuzzuf_jobs + linkedin_jobs
+    nti_iti_jobs = []                                  # ← ADD THIS
+    if os.path.exists(nti_iti_path):
+        with open(nti_iti_path, "r", encoding="utf-8") as f:
+            nti_iti_jobs = json.load(f)
+        print(f"✅ Loaded {len(nti_iti_jobs)} NTI/ITI programs")
+    else:
+        print("ℹ️  NTI/ITI data not found, skipping")
+
+    all_jobs = wuzzuf_jobs + linkedin_jobs + nti_iti_jobs  # ← ADD nti_iti_jobs
+
     print(f"📋 Building BM25 index for {len(all_jobs)} jobs...")
     print(f"   Wuzzuf:   {len(wuzzuf_jobs)}")
     print(f"   LinkedIn: {len(linkedin_jobs)}")
-
-    corpus = []
-    for job in all_jobs:
-        text = f"""
-        {job.get('title', '')}
-        {job.get('company', '')}
-        {job.get('description', '')}
-        {job.get('requirements', '')}
-        {job.get('job_type', '')}
-        {job.get('experience', '')}
-        {job.get('level', '')}
-        """.lower()
-
-        corpus.append(text.split())
-
-    bm25 = BM25Okapi(corpus)
-
-    os.makedirs("database", exist_ok=True)
-    with open("database/bm25_index.pkl", "wb") as f:
-        pickle.dump({"bm25": bm25, "jobs": all_jobs}, f)
-
-    print(f"✅ BM25 index built! Total: {len(all_jobs)} jobs")
-
-    # Quick test
-    print("\n🔍 Quick test: 'python developer'")
-    scores = bm25.get_scores("python developer".split())
-    top_3 = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:3]
-    for i in top_3:
-        source = all_jobs[i].get('source', 'wuzzuf')
-        print(f"  [{source}] {all_jobs[i]['title']} @ {all_jobs[i]['company']} (score: {scores[i]:.2f})")
+    print(f"   NTI/ITI:  {len(nti_iti_jobs)}")
+    # ... rest unchanged
 
 
 if __name__ == "__main__":

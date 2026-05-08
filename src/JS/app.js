@@ -3,6 +3,15 @@ function fillSearch(text) {
   search();
 }
 
+function getSelectedSources() {
+  const sources = [];
+  document.querySelectorAll('.source-filter:checked').forEach(checkbox => {
+    sources.push(checkbox.value);
+  });
+  console.log('📍 Selected sources:', sources);
+  return sources;
+}
+
 let allJobs = [];
 let shownCount = 0;
 const BATCH = 5;
@@ -69,6 +78,16 @@ async function search() {
   const query = document.getElementById('queryInput').value.trim();
   if (!query) return;
 
+  const sources = getSelectedSources();
+  
+  if (sources.length === 0) {
+    alert('Please select at least one website to search from');
+    return;
+  }
+
+  console.log('🔍 Searching with query:', query);
+  console.log('📍 Selected sources:', sources);
+
   allJobs = [];
   shownCount = 0;
   document.getElementById('loading').classList.remove('hidden');
@@ -81,7 +100,7 @@ async function search() {
     const res = await fetch('/search/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ query, sources })
     });
 
     const reader = res.body.getReader();

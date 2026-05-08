@@ -2,36 +2,36 @@
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pathlib  # Import the whole module to avoid naming conflicts
+import pathlib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from RAG.pipeline import ask_stream, ask_non_stream, hybrid_search
-# CV mathcer
 from fastapi import UploadFile, File
 from RAG.cv_matcher import match_cv_to_jobs
 from groq import Groq
 from dotenv import load_dotenv
 import json
+import chromadb
+from chromadb.config import Settings as ChromaSettings
 
-# Import new routers
+# Import routers
 from prediction.prediction_routes import router as prediction_router
 from agents.agent_routes import router as agent_router
 from notification_engine.notification_routes import router as notification_router
 
-#n8n requests
+# n8n requests
 import requests
 
 load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-
 # Groq for cv reading
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# init faskapi server
+# Init FastAPI server
 app = FastAPI()
 
 app.add_middleware(
@@ -40,6 +40,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Direct ChromaDB client (for accurate counts) ──
+chroma_client = chromadb.PersistentClient(
+    path="database/chroma_db",
+    settings=ChromaSettings(anonymized_telemetry=False)
+)
+chroma_collection = chroma_client.get_or_create_collection(name="jobs")
 
 # ── Static Files ──
 app.mount("/src", StaticFiles(directory="src"), name="src")
@@ -52,87 +59,86 @@ app.include_router(notification_router)
 
 class SearchRequest(BaseModel):
     query: str
+    sources: list = None
 
-# streaming
 
+# ── Streaming search ──
 @app.post("/search/stream")
 async def search_stream(req: SearchRequest):
     return StreamingResponse(
-        ask_stream(req.query),
+        ask_stream(req.query, sources=req.sources),
         media_type="text/event-stream"
     )
 
+
+# ── Recent Opportunities (reads directly from ChromaDB) ──
 @app.get("/api/recent-opportunities")
 async def get_recent_opportunities(limit: int = 8):
-    """Get recently posted job opportunities (fresh ones only)"""
+    """Get recently posted job opportunities directly from ChromaDB"""
     try:
-        # Search for general terms to get fresh opportunities
-        results = hybrid_search("new job opportunities fresh", n_results=limit)
-        
+        result = chroma_collection.get(
+            limit=limit,
+            include=["metadatas"]
+        )
         opportunities = []
-        for r in results:
-            job = r['job']
+        for meta in result["metadatas"]:
             opportunities.append({
-                "title": job.get('title', 'N/A'),
-                "company": job.get('company', 'N/A'),
-                "location": job.get('location', 'N/A'),
-                "experience": job.get('experience', 'N/A'),
-                "level": job.get('level', 'N/A'),
-                "job_type": job.get('job_type', 'N/A'),
-                "posted": job.get('posted', 'Recently'),
-                "url": job.get('url', '#'),
-                "source": job.get('source', 'wuzzuf'),
-                "match": int(r.get('score', 0) * 100) if r.get('score') else 85
+                "title":      meta.get("title", "N/A"),
+                "company":    meta.get("company", "N/A"),
+                "location":   meta.get("location", "N/A"),
+                "experience": meta.get("experience", "N/A"),
+                "level":      meta.get("level", "N/A"),
+                "job_type":   meta.get("job_type", "N/A"),
+                "posted":     meta.get("posted", "Recently"),
+                "url":        meta.get("url", "#"),
+                "source":     meta.get("source", "wuzzuf"),
+                "match":      85
             })
-        
         return {"opportunities": opportunities, "count": len(opportunities)}
     except Exception as e:
         return {"error": str(e), "opportunities": [], "count": 0}
 
+
+# ── Dashboard Stats (reads directly from ChromaDB) ──
 @app.get("/api/dashboard-stats")
 async def get_dashboard_stats():
-    """Get dashboard statistics"""
+    """Get real dashboard statistics directly from ChromaDB"""
     try:
-        # Get recent opportunities to aggregate stats
-        recent = hybrid_search("job opportunities technical developers engineers", n_results=50)
-        
-        total_opportunities = len(recent)
-        sources = set()
+        result = chroma_collection.get(include=["metadatas"])
+        all_meta = result["metadatas"]
+
+        total = len(all_meta)
+
         source_counts = {}
-        for r in recent:
-            job = r['job']
-            src = job.get('source', 'wuzzuf')
-            sources.add(src)
+        for m in all_meta:
+            src = m.get("source", "wuzzuf")
             source_counts[src] = source_counts.get(src, 0) + 1
-            
-        # Mock some profile strength stats for the dashboard demo, but realistic job counts
+
         return {
-            "totalOpportunities": total_opportunities,
-            "newThisWeek": max(1, int(total_opportunities * 0.4)), # estimate
+            "totalOpportunities": total,
+            "newThisWeek": source_counts.get("linkedin", 0) + source_counts.get("wuzzuf", 0),
             "applicationsActive": 5,
             "interviewsScheduled": 1,
-            "activeSources": len(sources),
+            "activeSources": len(source_counts),
             "profileScore": 82,
-            "freshJobs": total_opportunities,
-            "sourceDistribution": [{"label": k, "value": v} for k, v in source_counts.items()]
+            "freshJobs": total,
+            "sourceDistribution": [
+                {"label": k, "value": v} for k, v in source_counts.items()
+            ]
         }
     except Exception as e:
         return {"error": str(e)}
 
-# CV matching
 
+# ── CV Matching ──
 @app.post("/cv-match")
 async def cv_match(file: UploadFile = File(...)):
-    # اقرأ الـ PDF
     pdf_bytes = await file.read()
-
-    # جيب الـ matches
     matches, skills_profile = await match_cv_to_jobs(pdf_bytes, n_results=5)
 
     if not matches:
         return {"error": "مش قادر أقرأ الـ CV"}
 
-    # اسأل الـ LLM يشرح النتايج
     jobs_text = "\n".join([
         f"- {m['title']} @ {m['company']} ({m['match']}% match)"
         for m in matches
@@ -156,19 +162,14 @@ async def cv_match(file: UploadFile = File(...)):
     }
 
 
-
-# non-streaming (for testing/debugging)
-
+# ── Non-streaming search (for testing/debugging) ──
 @app.post("/search/non-stream")
 async def search_non_stream(req: SearchRequest):
-    # Use the non-streaming version
-    answer, jobs = await ask_non_stream(req.query)
-    
-    # Debug - شوف إيه اللي بيترجع
+    answer, jobs = await ask_non_stream(req.query, sources=req.sources)
     print(f"Jobs found: {len(jobs)}")
     print(f"First job: {jobs[0] if jobs else 'NONE'}")
-    
     return {"answer": answer, "jobs": jobs}
+
 
 # ── Page Routes ──
 @app.get("/")
@@ -196,19 +197,14 @@ async def notifications_page():
     return FileResponse("src/pages/notifications.html")
 
 
-# n8n 
-
+# ── n8n Integration ──
 def trigger_n8n_webhook(job_details):
-    # ده الـ Test URL اللي انت أخدته من n8n
     webhook_url = "http://localhost:5678/webhook-test/job-alert"
-    
-    # تفاصيل الوظيفة اللي هتبعتها للواتساب أو التليجرام
     payload = {
-        "title": job_details.get("title", "Unknown Job"),
+        "title":   job_details.get("title", "Unknown Job"),
         "company": job_details.get("company", "Unknown Company"),
-        "url": job_details.get("url", "https://linkedin.com")
+        "url":     job_details.get("url", "https://linkedin.com")
     }
-    
     try:
         response = requests.post(webhook_url, json=payload)
         if response.status_code == 200:
@@ -222,9 +218,9 @@ def trigger_n8n_webhook(job_details):
 @app.get("/api/test-n8n")
 def test_n8n_integration():
     test_job = {
-        "title": "Senior Python Developer",
+        "title":   "Senior Python Developer",
         "company": "Tech Valley",
-        "url": "https://wuzzuf.net/jobs/123"
+        "url":     "https://wuzzuf.net/jobs/123"
     }
     trigger_n8n_webhook(test_job)
     return {"status": "Test sent to n8n!"}

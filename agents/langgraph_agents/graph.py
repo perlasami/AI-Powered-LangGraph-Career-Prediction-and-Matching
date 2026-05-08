@@ -70,20 +70,30 @@ def _load_job_data():
     global _jobs_cache
     try:
         # Load LinkedIn data
-        with open("data/processed/linkedin_full.json", "r", encoding="utf-8") as f:
-            linkedin_jobs = json.load(f)
-            _jobs_cache["linkedin"] = linkedin_jobs
-            print(f"✅ Loaded {len(linkedin_jobs)} LinkedIn jobs")
+        linkedin_path = "data/processed/linkedin_full.json"
+        if os.path.exists(linkedin_path):
+            with open(linkedin_path, "r", encoding="utf-8") as f:
+                linkedin_jobs = json.load(f)
+                _jobs_cache["linkedin"] = linkedin_jobs
+                print(f"✅ Loaded {len(linkedin_jobs)} LinkedIn jobs")
+        else:
+            _jobs_cache["linkedin"] = []
+            print("ℹ️  LinkedIn data not found, skipping")
     except Exception as e:
         print(f"⚠️  Failed to load LinkedIn data: {e}")
         _jobs_cache["linkedin"] = []
     
     try:
         # Load Wuzzuf data
-        with open("data/processed/wuzzuf_full.json", "r", encoding="utf-8") as f:
-            wuzzuf_jobs = json.load(f)
-            _jobs_cache["wuzzuf"] = wuzzuf_jobs
-            print(f"✅ Loaded {len(wuzzuf_jobs)} Wuzzuf jobs")
+        wuzzuf_path = "data/processed/wuzzuf_full.json"
+        if os.path.exists(wuzzuf_path):
+            with open(wuzzuf_path, "r", encoding="utf-8") as f:
+                wuzzuf_jobs = json.load(f)
+                _jobs_cache["wuzzuf"] = wuzzuf_jobs
+                print(f"✅ Loaded {len(wuzzuf_jobs)} Wuzzuf jobs")
+        else:
+            _jobs_cache["wuzzuf"] = []
+            print("⚠️  Wuzzuf data not found")
     except Exception as e:
         print(f"⚠️  Failed to load Wuzzuf data: {e}")
         _jobs_cache["wuzzuf"] = []

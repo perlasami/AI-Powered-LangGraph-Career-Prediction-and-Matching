@@ -8,3 +8,39 @@ __pycache__/
 .env
 src/css/output.css
 .venv/
+
+# Virtual Environment
+venv/
+venv311/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Database
+*.db
+*.sqlite3
+
+# Chroma / vector db
+chroma_db/
+database/chroma_db/
+
+# Logs
+*.log
+
+# Node
+node_modules/
+
+# Uploads
+uploads/
+temp/

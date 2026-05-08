@@ -32,12 +32,20 @@ if VECTOR_DB_TYPE == "pinecone" and PINECONE_API_KEY:
     except Exception as e:
         print(f"⚠️  Pinecone failed: {e}, falling back to Chroma")
         import chromadb
-        db_client = chromadb.PersistentClient(path="database/chroma_db") 
+        from chromadb.config import Settings
+        db_client = chromadb.PersistentClient(
+            path="database/chroma_db",
+            settings=Settings(anonymized_telemetry=False)
+        ) 
         collection = db_client.get_collection("jobs")
         use_pinecone = False
 else:
     import chromadb
-    db_client = chromadb.PersistentClient(path="database/chroma_db") 
+    from chromadb.config import Settings
+    db_client = chromadb.PersistentClient(
+        path="database/chroma_db",
+        settings=Settings(anonymized_telemetry=False)
+    ) 
     collection = db_client.get_collection("jobs")
     use_pinecone = False 
 

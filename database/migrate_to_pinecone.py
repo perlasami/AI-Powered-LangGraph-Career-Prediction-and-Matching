@@ -22,9 +22,13 @@ EMBEDDING_DIMENSION = 384  # Output dimension of MiniLM model
 BATCH_SIZE = 100  # Pinecone batch upload size
 
 # Initialize
+from chromadb.config import Settings
 pc = Pinecone(api_key=PINECONE_API_KEY)
 model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-chroma_client = chromadb.PersistentClient(path="database/chroma_db")
+chroma_client = chromadb.PersistentClient(
+    path="database/chroma_db",
+    settings=Settings(anonymized_telemetry=False)
+)
 
 
 def create_pinecone_index():

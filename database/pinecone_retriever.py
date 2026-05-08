@@ -10,7 +10,8 @@ from dotenv import load_dotenv
 from pinecone import Pinecone
 from sentence_transformers import SentenceTransformer
 
-load_dotenv()
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
 
 # Configuration
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -66,7 +67,7 @@ def is_job_fresh(job_dict):
     return True
 
 
-def hybrid_search(query, n_results=15):
+def hybrid_search(query, n_results=15, sources=None):
     """
     Hybrid search combining:
     1. Vector search (Pinecone) - semantic similarity
@@ -125,12 +126,25 @@ def hybrid_search(query, n_results=15):
     print("\n🔄 Combining results with RRF...")
     seen_titles = set()
     top_results = []
-    
+
+    # Normalize sources filter once
+    allowed_sources = None
+    if sources:
+        allowed_sources = {s.lower().strip() for s in sources}
+        if 'wuzzuf' in allowed_sources:
+            allowed_sources.add('live')  # treat live scrape as wuzzuf alias
+
     for url in sorted(rrf_scores, key=rrf_scores.get, reverse=True):
         job = all_jobs_by_url.get(url)
         
         if not job:
             continue
+
+        # Source filtering
+        if allowed_sources:
+            job_source = job.get('source', 'wuzzuf').lower()
+            if job_source not in allowed_sources:
+                continue
         
         title_key = job['title'].lower().strip()
         if title_key in seen_titles:

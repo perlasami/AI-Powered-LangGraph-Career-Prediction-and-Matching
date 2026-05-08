@@ -1,9 +1,13 @@
 # database/search_test.py
 import chromadb
+from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 
 model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-client = chromadb.PersistentClient(path="database/chroma_db")
+client = chromadb.PersistentClient(
+    path="database/chroma_db",
+    settings=Settings(anonymized_telemetry=False)
+)
 collection = client.get_collection("jobs")
 
 def search_jobs(query, n_results=3):

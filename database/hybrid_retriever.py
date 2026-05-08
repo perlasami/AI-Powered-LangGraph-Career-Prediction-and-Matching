@@ -12,8 +12,12 @@ except ImportError:
     print("⚠️  sentence_transformers not available, vector search disabled")
     model = None
 
-client = chromadb.PersistentClient(path="database/chroma_db")
-collection = client.get_collection("jobs")
+from chromadb.config import Settings
+client = chromadb.PersistentClient(
+    path="database/chroma_db",
+    settings=Settings(anonymized_telemetry=False)
+)
+collection = client.get_or_create_collection("jobs")
 
 with open("database/bm25_index.pkl", "rb") as f:
     data = pickle.load(f)
@@ -21,12 +25,13 @@ with open("database/bm25_index.pkl", "rb") as f:
     jobs = data["jobs"]
 
 
-def hybrid_search(query, n_results=15):
+def hybrid_search(query, n_results=15, sources=None):
     if not HAS_SENTENCE_TRANSFORMERS:
         print(f"⚠️  Vector search disabled, returning empty results")
         return []
         
     print(f"\n🔍 Query: '{query}'")
+    print(f"📍 Sources filter: {sources}")
     print("=" * 50)
 
     # ── 1. BM25 Search → رتّب كل الوظايف ──
@@ -76,6 +81,19 @@ def hybrid_search(query, n_results=15):
         if title_key in seen_titles:
             continue
 
+        # ── Filter by sources if provided ──
+        if sources is not None:  # explicit source filtering requested
+            if len(sources) == 0:  # empty list = return no results
+                continue  # skip all jobs
+            # filter to only selected sources
+            job_source = job.get('source', 'wuzzuf').lower().strip()
+            sources_normalized = [s.lower().strip() for s in sources]
+            # Treat 'wuzzuf' and 'live' as same source
+            if 'wuzzuf' in sources_normalized:
+                sources_normalized.append('live')
+            if job_source not in sources_normalized:
+                continue
+
         seen_titles.add(title_key)
         top_results.append({
             "job": job,
@@ -86,42 +104,40 @@ def hybrid_search(query, n_results=15):
             break
 
     # ── 5. فلترة الوظائف الحديثة والمفتوحة ✅ ──
+   
     import datetime
+    # ── 5. Filter for fresh/open jobs ──
+# ── 5. Filter for fresh/open jobs ──
     fresh_results = []
-    
+
     for r in top_results:
         job = r['job']
         status = job.get('status', '').lower()
-        
-        # فحص الحالة
+
         if status and status != 'open':
             continue
-        
-        # فحص تاريخ النشر
+
         posted_date_str = job.get('posted', '')
         keep_job = True
-        
-        if posted_date_str:
+
+        if posted_date_str and posted_date_str.strip().lower() not in ('n/a', '', 'none'):
             try:
                 for date_format in ["%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y"]:
                     try:
                         posted_date = datetime.datetime.strptime(posted_date_str, date_format).date()
                         today = datetime.date.today()
-                        delta_days = (today - posted_date).days
-                        
-                        # خلال آخر 14 يوم فقط
-                        if delta_days > 14:
+                        if (today - posted_date).days > 14:
                             keep_job = False
                         break
                     except ValueError:
                         continue
             except Exception:
-                pass  # بدون تاريخ = حديثة
-        
+                pass
+
         if keep_job:
             fresh_results.append(r)
-    
-    # ── 6. اعرض النتايج ──
+
+    # ── 6. Print and return results ──
     for i, r in enumerate(fresh_results):
         job = r['job']
         print(f"\n#{i+1} (score: {r['score']})")
@@ -131,8 +147,7 @@ def hybrid_search(query, n_results=15):
         print(f"  Experience: {job.get('experience', 'N/A')}")
         print(f"  Level:      {job.get('level', 'N/A')}")
         print(f"  Job Type:   {job.get('job_type', 'N/A')}")
-        source = job.get('source', 'wuzzuf')
-        print(f"  Source:     {source}")
+        print(f"  Source:     {job.get('source', 'wuzzuf')}")
 
     return fresh_results
 

@@ -3,7 +3,7 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from groq import Groq
-from database.hybrid_retriever import hybrid_search
+from database.pinecone_retriever import hybrid_search
 from dotenv import load_dotenv
 from dotenv import load_dotenv
 # fresh and open jobs filter
@@ -171,16 +171,32 @@ def results_are_relevant(query, results, min_keyword_match=0.3):
 
 #     return response.choices[0].message.content, results
 
-async def ask_stream(user_query):
+def _filter_by_sources(results, sources):
+    """Filter search results to only include jobs from the selected sources."""
+    if not sources:
+        return results  # no filter = return all
+    norm = [s.lower().strip() for s in sources]
+    # treat 'live' as wuzzuf alias
+    if 'wuzzuf' in norm:
+        norm.append('live')
+    filtered = [r for r in results if r['job'].get('source', 'wuzzuf').lower() in norm]
+    return filtered
+
+
+async def ask_stream(user_query, sources=None):
     """بترجع generator بيدي الكلام كلمة كلمة"""
-    results = hybrid_search(user_query, n_results=15)
+    results = hybrid_search(user_query, n_results=15, sources=sources)
 
     # check result are fresh first
     results = filter_fresh_open_jobs(results)
 
-    if not results_are_relevant(user_query, results):
+    # Only do live scraping if user explicitly selected wuzzuf/live — never if sources is None or missing
+    can_do_live_scrape = bool(sources) and any(s.lower() in ('wuzzuf', 'live') for s in sources)
+
+    if not results_are_relevant(user_query, results) and can_do_live_scrape:
         from scraper.live_scraper import live_search_async, add_to_db
-        live_jobs = await live_search_async(user_query)
+        # Pass sources to live scraper so it only scrapes from selected sources
+        live_jobs = await live_search_async(user_query, sources=sources)
         if live_jobs:
             add_to_db(live_jobs)
             results = [{"job": j, "score": 1.0} for j in live_jobs[:5]]
@@ -239,13 +255,17 @@ async def ask_stream(user_query):
     yield "data: [DONE]\n\n"
 
 
-async def ask_non_stream(user_query):
+async def ask_non_stream(user_query, sources=None):
     """Returns answer and jobs list as tuple (non-streaming version)"""
-    results = hybrid_search(user_query, n_results=15)
+    results = hybrid_search(user_query, n_results=15, sources=sources)
 
-    if not results_are_relevant(user_query, results):
+    # Only do live scraping if user explicitly selected wuzzuf/live — never if sources is None or missing
+    can_do_live_scrape = bool(sources) and any(s.lower() in ('wuzzuf', 'live') for s in sources)
+
+    if not results_are_relevant(user_query, results) and can_do_live_scrape:
         from scraper.live_scraper import live_search_async, add_to_db
-        live_jobs = await live_search_async(user_query)
+        # Pass sources to live scraper so it only scrapes from selected sources
+        live_jobs = await live_search_async(user_query, sources=sources)
         if live_jobs:
             add_to_db(live_jobs)
             results = [{"job": j, "score": 1.0} for j in live_jobs[:5]]
