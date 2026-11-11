@@ -22,14 +22,6 @@
 - 🤖 **Agentic workflow**: LangGraph nodes for [e.g. profile parsing → skill extraction → prediction → matching → report]
 - 📊 **Output**: [e.g. ranked roles, match scores, skill gaps]
 
-## 🏗️ Architecture
-[Insert a diagram or screenshot of your LangGraph flow]
-
-| Node / Agent | Responsibility |
-|---|---|
-| `[node_1]` | [what it does] |
-| `[node_2]` | [what it does] |
-| `[node_3]` | [what it does] |
 
 ## 🛠️ Tech Stack
 - **Orchestration:** LangGraph, LangChain
@@ -42,7 +34,6 @@
 
 ### Prerequisites
 - Python 3.10+
-- [API keys needed]
 
 ### Installation
 ```bash
@@ -56,16 +47,4 @@ pip install -r requirements.txt
 cp .env.example .env   # then add your keys
 ```
 
-### Run
-```bash
-[command to run the app]
-```
 
-## 💡 Example
-**Input:** [sample profile]
-**Output:** [sample predictions and matched jobs]
-
-## 📈 Results
-[Metrics, accuracy, or qualitative results if you have them]
-
-## 🗂️ Project Structure
